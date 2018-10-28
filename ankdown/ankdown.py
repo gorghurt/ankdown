@@ -57,7 +57,7 @@ import genanki
 
 from docopt import docopt
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 
 def simple_hash(text):
@@ -78,7 +78,6 @@ class Card(object):
         fields=[
             {"name": "Question"},
             {"name": "Answer"},
-            {"name": "Tags"},
         ],
         templates=[
             {
@@ -106,6 +105,7 @@ class Card(object):
         self.fields = []
         self.filename = filename
         self.deckname = deckname
+        self.tags = []
 
     def has_data(self):
         """True if we have any fields filled in."""
@@ -121,10 +121,10 @@ class Card(object):
 
     def finalize(self):
         """Ensure proper shape, for extraction into result formats."""
-        if len(self.fields) > 3:
-            self.fields = self.fields[:3]
+        if len(self.fields) > 2:
+            self.fields = self.fields[:2]
         else:
-            while len(self.fields) < 3:
+            while len(self.fields) < 2:
                 self.fields.append('')
 
     def to_character_separated_line(self, separator="\t"):
@@ -140,7 +140,7 @@ class Card(object):
             note_id = (simple_hash(self.deckname) + deck_index)
         else:
             note_id = random.randrange(1 << 30, 1 << 31)
-        return genanki.Note(model=Card.MODEL, fields=self.fields, guid=note_id)
+        return genanki.Note(model=Card.MODEL, fields=self.fields, guid=note_id, tags=self.tags)
 
     def make_absolute_from_relative(self, filename):
         """Take a filename relative to the card, and make it absolute."""
@@ -162,6 +162,7 @@ class Card(object):
                 yield self.make_absolute_from_relative(match.group(1))
             for match in re.finditer(r'\[sound:(.*?)\]', field):
                 yield self.make_absolute_from_relative(match.group(1))
+    
 
 
 class DeckCollection(dict):
@@ -261,7 +262,12 @@ def produce_cards(infile, filename=None, deckname=None):
         if stripped in ["%%", "---", "%"]:
             is_markdown = not current_card.has_front_and_back()
             field = compile_field(current_field_lines, is_markdown=is_markdown)
-            current_card.add_field(field)
+            if is_markdown:
+                current_card.add_field(field)
+            else:
+                field=field.replace(',',' ')
+                tags=field.split()
+                current_card.tags=tags
             current_field_lines = []
             if stripped in ["%%", "---"]:
                 yield current_card
